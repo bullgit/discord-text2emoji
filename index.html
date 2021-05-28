@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Text2Emoji v0.7.0</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
+          "Lucida Sans", Arial, sans-serif;
+      }
+
+      .container {
+        height: 100%;
+        padding: 1rem;
+        display: grid;
+        grid-gap: 0.5rem;
+        grid-template-rows: auto 1fr 1fr auto;
+      }
+
+      .container h1:first-of-type {
+        margin: 0;
+        font-size: min(3rem, max(1.5rem, calc(100vw / 18)));
+      }
+
+      .container-output {
+        position: relative;
+      }
+
+      .container-output > #indicator {
+        position: absolute;
+        bottom: 0.5rem;
+        right: 0.5rem;
+      }
+
+      textarea {
+        display: block;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        resize: none;
+      }
+
+      textarea#output {
+        background: #eee;
+      }
+
+      textarea#output.error {
+        background: #f33;
+        color: white;
+      }
+
+      .status {
+        line-height: 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        flex: 1;
+      }
+
+      .status > * {
+        flex: 1 auto;
+      }
+
+      .status > .status-item {
+        display: flex;
+        gap: 0.25rem;
+      }
+
+      .status > .status-item .label::after {
+        content: ":";
+      }
+
+      .status > .status-item.space input {
+        flex: 1;
+      }
+
+      #copy {
+        width: 4rem;
+        background: #ccc;
+        border-color: #ccc;
+        transition: 200ms linear background;
+        padding: 0;
+        margin: 0;
+        text-align: center;
+        /* border: 2px solid #333; */
+      }
+
+      #copy::after {
+        content: "Copy";
+      }
+
+      #copy.copied {
+        background: #33f;
+        color: white;
+      }
+
+      #copy.copied::after {
+        content: "Copied!";
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>😎 Discord Text2Emoji</h1>
+
+      <textarea
+        name="input"
+        id="input"
+        cols="30"
+        rows="10"
+        placeholder="Enter text here!"
+      ></textarea>
+
+      <textarea
+        name="output"
+        id="output"
+        cols="30"
+        rows="10"
+        readonly
+      ></textarea>
+
+      <div class="status">
+        <div class="status-item character-count">
+          <span class="label">Character count</span>
+          <span id="indicator"> 0 </span>
+        </div>
+        <label class="status-item space" for="space">
+          <span class="label">Space</span>
+          <input type="text" id="space" value=":black_large_square:" />
+        </label>
+        <div id="separator" class="status-item separator">
+          <span class="label">Separator</span>
+          <label for="separator_space">
+            <input
+              id="separator_space"
+              name="separatorValue"
+              type="radio"
+              value="20"
+              checked
+            />
+            Space
+          </label>
+          <label for="separator_zero">
+            <input
+              id="separator_zero"
+              name="separatorValue"
+              type="radio"
+              value="FEFF"
+            />
+            Zero Space
+          </label>
+        </div>
+        <button id="copy"></button>
+      </div>
+    </div>
+    <script>
+      const emojiSeparator = "\x20";
+      const emojiRegionalIndicator = ":regional_indicator_%s:";
+      const emojiSmallLimit = 27;
+      const charLimit = 2000;
+
+      function getRegionalIndicator(chars) {
+        return chars
+          .split("")
+          .map((char) =>
+            emojiRegionalIndicator.replace("%s", char.toLowerCase())
+          )
+          .join("");
+      }
+
+      function getEmoji(char) {
+        switch (char) {
+          case "0":
+            return ":zero:";
+          case "1":
+            return ":one:";
+          case "2":
+            return ":two:";
+          case "3":
+            return ":three:";
+          case "4":
+            return ":four:";
+          case "5":
+            return ":five:";
+          case "6":
+            return ":six:";
+          case "7":
+            return ":seven:";
+          case "8":
+            return ":eight:";
+          case "9":
+            return ":nine:";
+          case " ":
+            return ":space:";
+          case ".":
+            return ":radio_button:";
+          case "!":
+            return ":grey_exclamation:";
+          case "?":
+            return ":grey_question:";
+          case "ä":
+            return getRegionalIndicator("ae");
+          case "ö":
+            return getRegionalIndicator("oe");
+          case "ü":
+            return getRegionalIndicator("ue");
+          case "ß":
+            return getRegionalIndicator("ss");
+
+          default:
+            return /[a-z]/.test(char) ? getRegionalIndicator(char) : char;
+        }
+      }
+
+      function text2emoji(input = "", separator = emojiSeparator) {
+        let result = "";
+
+        if (input.length > 0) {
+          result = input
+            .toLowerCase()
+            .replace(/./g, (char) => getEmoji(char, separator))
+            .replace(/(:\w+:)(?=:\w+:)/gi, `$1${separator}`);
+        }
+
+        return result;
+      }
+
+      function copyToClipboard(text) {
+        const previousFocus = window.activeElement;
+        const textarea = document.createElement("textarea");
+        textarea.className = "copy-button-helper";
+        textarea.value = text;
+
+        document.body.appendChild(textarea);
+
+        textarea.select();
+        // For mobile devices
+        textarea.setSelectionRange(0, textarea.value.length);
+
+        document.execCommand("copy");
+
+        textarea.remove();
+
+        previousFocus && previousFocus.focus();
+      }
+
+      const elInput = document.querySelector("#input");
+      const elOutput = document.querySelector("#output");
+      const elCopy = document.querySelector("#copy");
+      const elIndicator = document.querySelector("#indicator");
+      const elSpace = document.querySelector("#space");
+      const elSeparator = document.querySelector("#separator");
+
+      function getSeparator() {
+        const element = elSeparator.querySelector(
+          'input[name="separatorValue"]:checked'
+        );
+
+        return element
+          ? String.fromCharCode(parseInt(element.value, 16))
+          : emojiSeparator;
+      }
+
+      function applyChange() {
+        const value = text2emoji(elInput.value, getSeparator()).replace(
+          /:space:/g,
+          elSpace.value
+        );
+
+        const smallEmoji =
+          (value.match(/:\w+:/gi) || []).length > emojiSmallLimit;
+
+        elOutput.classList[value.length > charLimit ? "add" : "remove"](
+          "error"
+        );
+
+        elIndicator.innerText = `${value.length}/${charLimit} [${
+          smallEmoji ? "small" : "big"
+        }]`;
+
+        elOutput.value = value;
+      }
+
+      elCopy.addEventListener("click", () => {
+        setTimeout(() => elCopy.classList.remove("copied"), 1000);
+        elCopy.classList.add("copied");
+        copyToClipboard(elOutput.value);
+      });
+      elInput.addEventListener("input", () => applyChange());
+      elSpace.addEventListener("input", () => applyChange());
+      elSeparator.addEventListener("change", () => applyChange());
+
+      applyChange();
+
+      elInput.focus();
+    </script>
+  </body>
+</html>
